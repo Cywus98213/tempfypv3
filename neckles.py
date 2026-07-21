@@ -25,6 +25,20 @@ def wait_for_connection():
             sock.close()
             time.sleep(2)
 
+def send_all(sock, data):
+    total_sent = 0
+    while total_sent < len(data):
+        try:
+            sent = sock.send(data[total_sent:])
+        except OSError as exc:
+            raise RuntimeError(f"Socket send failed: {exc}") from exc
+
+        if sent == 0:
+            raise RuntimeError("Socket closed during send")
+
+        total_sent += sent
+
+
 def stream_frames(sock):
     # Use USB webcam via V4L2
     cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
@@ -48,8 +62,8 @@ def stream_frames(sock):
             data = buffer.tobytes()
 
             # Send length (4 bytes) + data
-            sock.send(struct.pack(">I", len(data)))
-            sock.send(data)
+            send_all(sock, struct.pack(">I", len(data)))
+            send_all(sock, data)
             print(f"Frame sent ({len(data)} bytes)")
             time.sleep(0.5)
     except Exception as e:
