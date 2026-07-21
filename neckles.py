@@ -1,64 +1,42 @@
 import cv2
 import bluetooth
+import struct
 import time
 
-# Replace with your Android device's MAC address
-SERVER_MAC = "00001101-0000-1000-8000-00805F9B34FB"
+phone_mac = "F0:05:1B:5A:7C:5C"
+uuid = "00001101-0000-1000-8000-00805F9B34FB"
 
-def find_device_port(mac_address):
-    print(f"🔎 Searching for services on {mac_address}...")
-    services = bluetooth.find_service(address=mac_address)
+services = bluetooth.find_service(uuid=uuid, address=phone_mac)
+if not services:
+    print("Service not found")
+    exit()
 
-    if not services:
-        raise Exception("No Bluetooth services found on device")
+port = services[0]["port"]
+sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+sock.connect((phone_mac, port))
+print("Connected on port", port)
 
-    # Pick the first RFCOMM service
-    for svc in services:
-        if svc["protocol"] == "RFCOMM":
-            port = svc["port"]
-            name = svc.get("name", "Unknown")
-            print(f"Found RFCOMM service '{name}' on port {port}")
-            return port
+cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
-    raise Exception("No RFCOMM service found")
+try:
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Capture failed")
+            break
 
-def connect_bluetooth(mac_address):
-    port = find_device_port(mac_address)
-    sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    sock.connect((mac_address, port))
-    print(f"🔗 Connected to {mac_address} on port {port}")
-    return sock
+        # Encode as JPEG
+        _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        data = buffer.tobytes()
 
-def capture_and_stream(sock):
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Camera not accessible")
-        return
+        # Send length (4 bytes) + data
+        sock.send(struct.pack(">I", len(data)))
+        sock.send(data)
+        print("Frame sent.")
 
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Failed to grab frame")
-                break
+        time.sleep(0.5)  # adjust for frame rate
+except KeyboardInterrupt:
+    print("Stopped by user")
 
-            # Encode frame as JPEG
-            _, buffer = cv2.imencode(".jpg", frame)
-            data = buffer.tobytes()
-
-            # Send length first, then data
-            sock.send(str(len(data)).encode("utf-8") + b"\n")
-            sock.send(data)
-            print(f"Sent frame ({len(data)} bytes)")
-
-            time.sleep(0.1)
-
-    except KeyboardInterrupt:
-        print("Interrupted, closing...")
-    finally:
-        cap.release()
-        sock.close()
-
-if __name__ == "__main__":
-    sock = connect_bluetooth(SERVER_MAC)
-    capture_and_stream(sock)
+cap.release()
+sock.close()
