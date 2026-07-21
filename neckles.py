@@ -30,7 +30,7 @@ def send_all(sock, data):
     while total_sent < len(data):
         try:
             sent = sock.send(data[total_sent:])
-        except OSError as exc:
+        except Exception as exc:
             raise RuntimeError(f"Socket send failed: {exc}") from exc
 
         if sent == 0:
@@ -62,8 +62,13 @@ def stream_frames(sock):
             data = buffer.tobytes()
 
             # Send length (4 bytes) + data
-            send_all(sock, struct.pack(">I", len(data)))
-            send_all(sock, data)
+            try:
+                send_all(sock, struct.pack(">I", len(data)))
+                send_all(sock, data)
+            except Exception as e:
+                print(f"Frame send failed: {e}")
+                break
+
             print(f"Frame sent ({len(data)} bytes)")
             time.sleep(0.5)
     except Exception as e:
