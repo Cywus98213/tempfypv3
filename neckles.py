@@ -38,8 +38,8 @@ def wait_for_connection():
 def stream_frames(sock):
     """Capture frames from USB webcam and stream them over Bluetooth."""
     cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
     if not cap.isOpened():
         print("Failed to open /dev/video0")
@@ -53,8 +53,9 @@ def stream_frames(sock):
                 print("Capture failed")
                 break
 
-            # Encode as JPEG
-            _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+            # Encode as JPEG with stronger compression for smaller payloads
+            resized_frame = cv2.resize(frame, (160, 120))
+            _, buffer = cv2.imencode(".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 30])
             data = buffer.tobytes()
 
             # Send length (4 bytes) + data
