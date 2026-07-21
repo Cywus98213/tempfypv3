@@ -2,6 +2,7 @@ import bluetooth
 import struct
 import time
 from picamera2 import Picamera2
+import cv2
 
 # Replace with your phone's MAC address
 phone_mac = "F0:05:1B:5A:7C:5C"
@@ -18,9 +19,9 @@ sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
 sock.connect((phone_mac, port))
 print(f"Connected on port {port}")
 
-# Initialize PiCamera2
+# Initialize PiCamera2 in headless mode
 picam = Picamera2()
-picam.configure(picam.create_video_configuration())
+picam.configure(picam.create_video_configuration(main={"size": (640, 480)}))
 picam.start()
 
 try:
@@ -29,7 +30,6 @@ try:
         frame = picam.capture_array()
 
         # Encode as JPEG
-        import cv2
         _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
         data = buffer.tobytes()
 
