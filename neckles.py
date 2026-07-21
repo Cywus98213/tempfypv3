@@ -1,14 +1,19 @@
+import os
 import cv2
 import bluetooth
 import struct
 import time
 
+# Force headless mode (no framebuffer/X11)
+os.environ["DISPLAY"] = ""
+
 phone_mac = "F0:05:1B:5A:7C:5C"
 uuid = "00001101-0000-1000-8000-00805F9B34FB"
 
+# Discover service dynamically
 services = bluetooth.find_service(uuid=uuid, address=phone_mac)
 if not services:
-    print("Service not found")
+    print("Service not found. Is the Android app running and discoverable?")
     exit()
 
 port = services[0]["port"]
@@ -16,13 +21,14 @@ sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
 sock.connect((phone_mac, port))
 print("Connected on port", port)
 
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+# Use default backend (avoid framebuffer hijack)
+cap = cv2.VideoCapture(0)
 
 try:
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Capture failed")
+            print(" Capture failed")
             break
 
         # Encode as JPEG
@@ -32,7 +38,7 @@ try:
         # Send length (4 bytes) + data
         sock.send(struct.pack(">I", len(data)))
         sock.send(data)
-        print("Frame sent.")
+        print(f"Frame sent ({len(data)} bytes)")
 
         time.sleep(0.5)  # adjust for frame rate
 except KeyboardInterrupt:
