@@ -6,7 +6,17 @@ import cv2
 phone_mac = "F0:05:1B:5A:7C:5C"
 uuid = "00001101-0000-1000-8000-00805F9B34FB"
 
+def send_all(sock, data):
+    """Ensure the entire buffer is sent over Bluetooth."""
+    total_sent = 0
+    while total_sent < len(data):
+        sent = sock.send(data[total_sent:])
+        if sent == 0:
+            raise RuntimeError("Socket connection broken")
+        total_sent += sent
+
 def wait_for_connection():
+    """Keep trying until the phone app is discoverable and listening."""
     while True:
         print("Waiting for Bluetooth service...")
         services = bluetooth.find_service(uuid=uuid, address=phone_mac)
@@ -25,22 +35,8 @@ def wait_for_connection():
             sock.close()
             time.sleep(2)
 
-def send_all(sock, data):
-    total_sent = 0
-    while total_sent < len(data):
-        try:
-            sent = sock.send(data[total_sent:])
-        except Exception as exc:
-            raise RuntimeError(f"Socket send failed: {exc}") from exc
-
-        if sent == 0:
-            raise RuntimeError("Socket closed during send")
-
-        total_sent += sent
-
-
 def stream_frames(sock):
-    # Use USB webcam via V4L2
+    """Capture frames from USB webcam and stream them over Bluetooth."""
     cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -62,12 +58,8 @@ def stream_frames(sock):
             data = buffer.tobytes()
 
             # Send length (4 bytes) + data
-            try:
-                send_all(sock, struct.pack(">I", len(data)))
-                send_all(sock, data)
-            except Exception as e:
-                print(f"Frame send failed: {e}")
-                break
+            sock.send(struct.pack(">I", len(data)))
+            send_all(sock, data)
 
             print(f"Frame sent ({len(data)} bytes)")
             time.sleep(0.5)
