@@ -1,7 +1,6 @@
 import bluetooth
 import struct
 import time
-from picamera2 import Picamera2
 import cv2
 
 phone_mac = "F0:05:1B:5A:7C:5C"
@@ -27,16 +26,28 @@ def wait_for_connection():
             time.sleep(2)
 
 def stream_frames(sock):
-    picam = Picamera2()
-    picam.configure(picam.create_video_configuration(main={"size": (640, 480)}))
-    picam.start()
+    # Use USB webcam via V4L2
+    cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    if not cap.isOpened():
+        print("Failed to open /dev/video0")
+        sock.close()
+        return
 
     try:
         while True:
-            frame = picam.capture_array()
+            ret, frame = cap.read()
+            if not ret:
+                print("Capture failed")
+                break
+
+            # Encode as JPEG
             _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             data = buffer.tobytes()
 
+            # Send length (4 bytes) + data
             sock.send(struct.pack(">I", len(data)))
             sock.send(data)
             print(f"Frame sent ({len(data)} bytes)")
@@ -44,7 +55,7 @@ def stream_frames(sock):
     except Exception as e:
         print(f"Streaming stopped: {e}")
     finally:
-        picam.stop()
+        cap.release()
         sock.close()
 
 if __name__ == "__main__":
