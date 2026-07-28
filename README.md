@@ -79,7 +79,7 @@ phone_mac = "phone_mac"
 uuid = "00001101-0000-1000-8000-00805F9B34FB"
 ```
 
-Replace the Phone MAC and the MAC address with the address of the Bluetooth device you want to connect to.
+Replace the MAC address with the address of the Bluetooth device you want to connect to.
 
 ### 2. Camera device
 
